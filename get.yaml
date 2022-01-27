@@ -1,0 +1,110 @@
+- hosts: win
+  vars:
+   accaptable_lang: ['DK', 'LV', 'UK', 'RU', 'ES']
+  collections:
+   - community.windows.win_domain_user
+  vars_prompt:
+   - name: exusername
+     prompt:  login name of Existing user?
+     private: no
+   - name: username
+     prompt: ' login name of NEW user?         '
+     private: no
+   - name: firstname
+     prompt: ' FIRSTname of NEW user?          '
+     private: no
+   - name: surname
+     prompt: ' SURname of NEW user?            '
+     private: no
+   - name: email
+     prompt: ' Email address of NEW user?      '
+     private: no
+   - name: title
+     prompt: ' TITLE of NEW user?              '
+     private: no
+   - name: lphnum
+     prompt: ' Land Pnhone Number of NEW user? '
+     private: no
+   - name: mphnum
+     prompt: ' Mobile Phone Number of NEW user?'
+     private: no
+   - name: signature
+     prompt: ' Signature language of NEW user? '
+     private: no
+   - name: descr
+     prompt: ' DESCRIPTION of NEW user?        '
+     private: no
+  tasks:
+   - fail: msg="signature lang is not acceptable"
+     when: signature not in accaptable_lang
+   - name: Check existing user exists
+     community.windows.win_domain_user:
+      name: '{{ exusername }}'
+      state: query
+     register: data_struct
+     failed_when: data_struct.state != "present"
+   - name: Check new username does not exist
+     community.windows.win_domain_user:
+      name: '{{ username }}'
+      state: query
+     register: new_user
+     failed_when: new_user.state == "present"
+   - set_fact:
+      email: "{{ username }}@{{ data_struct.upn.split('@')[1] }}"
+     when: 'email|length==0'
+   - set_fact:
+      path: 'OU=BUL-GB,OU=Users,OU=Pindstrup Mosebrug Users,DC=PINDSTRUP,DC=DK'
+     when: '"OU=BUL-GB" in data_struct.distinguished_name'
+   - set_fact:
+      path: 'OU=DAN-EE,OU=Users,OU=Pindstrup Mosebrug Users,DC=PINDSTRUP,DC=DK'
+     when: '"OU=DAN-EE" in data_struct.distinguished_name'
+   - set_fact:
+      path: 'OU=P-CN,OU=Users,OU=Pindstrup Mosebrug Users,DC=PINDSTRUP,DC=DK'
+     when: '"OU=P-CN" in data_struct.distinguished_name'
+   - set_fact:
+      path: 'OU=P-DK,OU=Users,OU=Pindstrup Mosebrug Users,DC=PINDSTRUP,DC=DK'
+     when: '"OU=P-DK" in data_struct.distinguished_name'
+   - set_fact:
+      path: 'OU=P-ES,OU=Users,OU=Pindstrup Mosebrug Users,DC=PINDSTRUP,DC=DK'
+     when: '"OU=P-ES" in data_struct.distinguished_name'
+   - set_fact:
+      path: 'OU=P-LV,OU=Users,OU=Pindstrup Mosebrug Users,DC=PINDSTRUP,DC=DK'
+     when: '"OU=P-LV" in data_struct.distinguished_name'
+   - set_fact:
+      path: 'OU=P-RU,OU=Users,OU=Pindstrup Mosebrug Users,DC=PINDSTRUP,DC=DK'
+     when: '"OU=P-RU" in data_struct.distinguished_name'
+   - set_fact:
+      path: 'OU=External Users,OU=Users,OU=Pindstrup Mosebrug Users,DC=PINDSTRUP,DC=DK'
+     when: '"OU=External" in data_struct.distinguished_name'
+   - set_fact:
+      descr1: 'ITF User creation automate'
+     when: 'descr|length==0'
+   - name: Create bob user
+     community.windows.win_domain_user:
+      name: '{{ username }}'
+      sam_account_name: '{{ username }}'
+      firstname: '{{ firstname }}'
+      surname: '{{ surname }}'
+      description: '{{ descr1 }}'
+      email: '{{ email }}'
+      account_locked: False
+      upn: "{{ username }}@{{ data_struct.upn.split('@')[1] }}"
+      domain_password: Change1tplease
+      domain_server: PINDSTRUP.DK
+      groups: '{{ data_struct.groups }}'
+      groups_action: add
+      path: '{{ path }}'
+      user_cannot_change_password: no
+      update_password: on_create
+      password: Change1tplease
+      password_expired: yes
+      password_never_expire: no
+      attributes:
+        displayname: '{{ firstname }} {{ surname }}'
+        title: '{{ title }}'
+        telephonenumber: '{{ lphnum }}'
+        mobile: '{{ mphnum }}'
+        st: '{{ data_struct.state_province }}'
+      state: present
+     register: create_user
+     failed_when: new_user.state == "present"
